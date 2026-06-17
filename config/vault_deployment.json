@@ -1,0 +1,10 @@
+{
+  "_comment": "Parameters for a new Plasma Vault created via FusionFactory.clone(...). Restricted to USDC underlying. The owner address is read from the env var named by 'owner_env' (never commit it).",
+  "register_as": "bizantine_usdc_vault",
+  "chain": "ethereum",
+  "asset_name": "Bizantine USDC Fusion Vault",
+  "asset_symbol": "bizUSDC",
+  "underlying_asset": "USDC",
+  "redemption_delay_seconds": 0,
+  "owner_env": "VAULT_OWNER_ADDRESS"
+}

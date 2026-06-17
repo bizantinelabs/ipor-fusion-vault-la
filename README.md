@@ -23,6 +23,8 @@ config/
   fuses.json
   allocation_policy.json
   approved_markets.json
+  factory.json
+  vault_deployment.json
 bot/
   context.py
   vault_state.py
@@ -30,16 +32,19 @@ bot/
   yields.py
   rebalance.py
   execute.py
+  deploy.py
   report.py
 scripts/
   vault_info.py
   propose_rebalance.py
   execute_rebalance.py
   report_allocations.py
+  deploy_vault.py
 docs/
   strategy.md
   operations.md
   risk-framework.md
+  deployment.md
 .env.example
 requirements.txt
 ```
@@ -88,6 +93,34 @@ Live execution after manual approval:
 export OPERATOR_PRIVATE_KEY=0x...
 python scripts/execute_rebalance.py --execute
 ```
+
+## Create a new vault
+
+The `ipor-fusion` SDK only interacts with existing vaults, so a new Plasma Vault
+is created on-chain by calling the IPOR Fusion `FusionFactory.clone(...)` method.
+This is restricted to USDC underlying assets.
+
+1. Set the official `FusionFactory` address for your chain in
+   `config/factory.json` (the placeholder zero address is rejected). Find it via
+   docs.ipor.io / the IPOR Discord.
+2. Edit `config/vault_deployment.json` (chain, name, symbol, redemption delay).
+3. Set `VAULT_OWNER_ADDRESS` in `.env`.
+
+Dry run (predicts the new vault address via `eth_call`, sends nothing):
+
+```bash
+python scripts/deploy_vault.py
+```
+
+Live deployment after manual approval, registering the result into
+`config/vaults.json`:
+
+```bash
+export OPERATOR_PRIVATE_KEY=0x...
+python scripts/deploy_vault.py --execute --register
+```
+
+See `docs/deployment.md` for details.
 
 ## Safety rules
 
