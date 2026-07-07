@@ -7,12 +7,13 @@ You are deploying an **IPOR Fusion Plasma Vault** for Bizantine Labs. Bizantine 
 - **Product:** Bizantine cbBase USDC CORE  ·  **Symbol:** `bizcbBaseUSDC`  ·  **Asset:** USDC (Base, 6dp)
 - **Chain:** Base (8453)  ·  **Framework:** IPOR Fusion (`FusionFactory.clone`)  ·  **Spec:** v0.7
 - **Strategy:** USDC lending vault supplying Coinbase-Borrow-driven demand across cb-wrapped
-  collateral Morpho markets (cbBTC/cbETH/cbXRP/cbDOGE/cbADA/cbLTC) + Compound III + Aave V3 venue legs.
+  collateral Morpho markets (cbBTC/cbETH/cbXRP/cbDOGE/cbADA/cbLTC) + an Aave V3 venue leg. (Compound III USDC leg is deferred — no canonical fuse on Base yet; see RESOLUTIONS.md Gap A.)
 - **This folder:** `config/cbbase_usdc_core.json` (all params), `script/DeployCbBaseUsdcCore.s.sol`
-  (Foundry scaffold, grounded in real ipor-fusion interfaces), `VERIFY.md`, `.env.example`.
+  (Foundry scaffold, grounded in real ipor-fusion interfaces), `RESOLUTIONS.md` (READ THIS — resolves the
+  open items + records the canonical marketId model), `VERIFY.md`, `.env.example`.
 
 ## 0. PRE-FLIGHT GATE — do not broadcast until ALL are true
-1. Every `address(0)` / `CONFIRM_WITH_PAVEL` slot in the script + config is filled with a real Base address.
+1. All protocol addresses (FusionFactory, Morpho supply+balance, Aave supply+balance, Aave provider) are FILLED and VERIFIED ON-CHAIN (2026-07-07; see ONCHAIN_VERIFICATION.md). Remaining open items are DECISIONS, not addresses (see RESOLUTIONS.md "Still needed").
 2. Owner Safe / Atomist / Fee recipient confirmed **live and controllable on Base** (they were provided as `eth:` addresses — Safe/Fordefi must exist at the same address on Base, or record Base equivalents).
 3. IPOR Alpha service account + Hypernative guardian account received.
 4. `daoFeePackageIndex` + how the 10% perf / Biz–IPOR split maps to (package + FeeManager recipient) confirmed with Pavel.
@@ -32,21 +33,23 @@ You are deploying an **IPOR Fusion Plasma Vault** for Bizantine Labs. Bizantine 
   - `FeeManager.updatePerformanceFee(RecipientFee[])` / `updateManagementFee(RecipientFee[])`; `RecipientFee{ address recipient; uint256 feeValue }`.
   - Fuse constructors: `MorphoSupplyFuse(uint256 marketId, address morpho)`, `CompoundV3SupplyFuse(uint256 marketId, ...)`, `AaveV3SupplyFuse(uint256 marketId, address aaveV3PoolAddressesProvider)`. **Supply-fuse marketId is immutable.**
 
-## 2. THE KEY ARCHITECTURE DECISION (resolve with Pavel first)
-Per-market caps (cbBTC 50%, cbETH 25%, cbXRP 22%, cbDOGE 8%, cbADA 6%, cbLTC 5%) require a **distinct Fusion
-`marketId` per cb market** (ids 1–6), because Fusion caps are per-marketId and a supply fuse's marketId is
-immutable. That means **one MorphoSupplyFuse + one MorphoBalanceFuse instance per marketId**.
-- **Option A (default, in the scaffold):** IPOR provides/deploys per-marketId fuse instances (ids 1–6 Morpho,
-  10 Compound, 11 Aave). Full per-market caps enforced on-chain. ← preferred.
-- **Option B (fallback):** single Morpho marketId for all 6 markets → only an **aggregate** Morpho cap on-chain
-  (set 73–80%); per-cb caps then become Alpha-policy-only. Use only if IPOR won't provide per-market instances.
-Ask Pavel which, and adjust the script accordingly.
+## 2. Architecture — CANONICAL marketId model (already resolved; see RESOLUTIONS.md §1)
+IPOR's registry (`contracts/libraries/IporFusionMarkets.sol`) is authoritative:
+`MORPHO = 14` (single market; all 6 cb markets are **substrates** under it, balance summed),
+`AAVE_V3 = 1`, `MORPHO = 14`. `COMPOUND_V3_USDC = 2` exists in the lib but has NO fuse on Base (leg disabled). `ERC20_VAULT_BALANCE = 7` is not used (idle USDC is the underlying, counted natively).
+The script uses these. You need **7 canonical shared fuse instances** from Pavel (Morpho supply+balance,
+Launch config = Morpho(14) + Aave(1) supply+balance fuses — shared canonical instances, not 6 custom Morpho instances.
+- If Noah has chosen **Option A** (on-chain per-cb caps), Pavel must instead provide custom-marketId Morpho
+  instances (one per cb market) and you split `grantMarketSubstrates` + `setupMarketsLimits` per cb. Confirm
+  which option before building. Default = canonical (Option B).
 
-## 3. IMPORTANT: what is and isn't enforced on-chain
-- **On-chain:** per-marketId caps (§4 of the script), substrate allowlist, roles + timelock, fees, redemption delay, instant-withdraw ordering.
-- **NOT on-chain (Alpha policy + Hypernative only):** aggregate Morpho ≤80%, Tier2+3 ≤45%, Tier3 ≤15%, idle ≥5%.
-  Fusion market limits are independent per-market ceilings; their sum can exceed 100%. State this to the user in
-  your summary — the aggregate caps in the spec live in IPOR's Alpha policy, not the contract.
+## 3. What is / isn't enforced on-chain (canonical model)
+- **On-chain:** aggregate per-protocol caps — Morpho(14) ≤80%, Aave(1) ≤25%; substrate
+  allowlist; NO dependency balance graph (plain supply, no cross-market deps); roles + timelock; fees; redemption delay;
+  instant-withdraw order; scheduled-withdraw window.
+- **NOT on-chain (Alpha policy + Hypernative):** per-cb caps (cbBTC 50%, cbXRP 22%, …), tier buckets
+  (T2+3 ≤45%, T3 ≤15%), idle ≥5%. State this explicitly in your summary — on-chain, the Alpha could put up
+  to 80% in a single cb market; the per-cb limits are policy, not contract (unless Option A was chosen).
 
 ## 4. Authorization ordering (get this right or the config calls revert)
 `clone()` sets `owner_` = Owner Safe. Steps 2–7 of the script are `restricted` governance calls. Decide, against
@@ -56,10 +59,10 @@ Recommended: run all config (fuses/substrates/limits/oracle/withdraw/fees) **as 
 THEN grant the timelocked ATOMIST_ROLE last. Confirm and reorder `run()` if needed.
 
 ## 5. Build & dry-run
-1. Fill the scaffold from `config/cbbase_usdc_core.json`. Keep the locked constants; fill the `address(0)` slots.
+1. The scaffold is already filled + on-chain-verified. Do NOT change the locked constants or verified addresses. Resolve only the two DECISIONS (Compound leg; fee split) with Noah before broadcast.
 2. `forge build` — resolve every compile error against the real repo (fix imports/signatures, never stub).
 3. **Fork-simulate** against Base: `forge script script/DeployCbBaseUsdcCore.s.sol --rpc-url $BASE_RPC_URL --fork-url $BASE_RPC_URL -vvvv` (no `--broadcast`). Confirm the whole sequence succeeds on a fork.
-4. Re-pull live substrate data same-day (rates/liquidity move): Morpho Blue API for the 6 market ids + DefiLlama for Compound/Aave. Confirm each Tier2/3 market's available liquidity ≥ 3× its target position; if not, flag before allowlisting.
+4. Re-pull live substrate data same-day (rates/liquidity move): Morpho Blue API for the 6 market ids + DefiLlama for Aave. Confirm each Tier2/3 market's available liquidity >= 3x its target position; if not, flag before allowlisting.
 
 ## 6. Broadcast (only after §0 + fork sim pass)
 `forge script script/DeployCbBaseUsdcCore.s.sol --rpc-url $BASE_RPC_URL --broadcast --verify -vvvv`
