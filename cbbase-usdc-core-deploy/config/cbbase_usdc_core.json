@@ -1,0 +1,184 @@
+{
+  "meta": {
+    "product": "Bizantine cbBase USDC CORE",
+    "symbol": "bizcbBaseUSDC",
+    "chain": "Base",
+    "chainId": 8453,
+    "framework": "IPOR Fusion (Plasma Vault, ERC-4626)",
+    "specVersion": "v0.7",
+    "dataAsOf": "2026-07-06"
+  },
+  "asset": {
+    "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "decimals": 6
+  },
+  "redemptionDelaySeconds": 3600,
+  "protocols": {
+    "morphoBlue": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+    "morphoIRM": "0x46415998764C29aB2a25CbeA6254146D50D22687",
+    "compoundCometUSDC": "0xb125E6687d4313864e53df431d5425969c15Eb2F  // cUSDCv3 Base; still CONFIRM on BaseScan",
+    "aaveV3PoolAddressesProvider": "0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D  // VERIFIED from ipor-abi (mainnet-base-fusion); AaveV3SupplyFuse takes the PoolAddressesProvider, NOT the Pool",
+    "fusionFactory": "0x1455717668fA96534f675856347A973fA907e922  // VERIFIED IporFusionFactoryProxy (Base) from ipor-abi"
+  },
+  "fusionMarkets": [
+    {
+      "id": 1,
+      "label": "cbBTC/USDC",
+      "protocol": "morpho",
+      "substrate": "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+      "capPct": 0.5,
+      "tier": "T1",
+      "instantWithdraw": true
+    },
+    {
+      "id": 2,
+      "label": "cbETH/USDC",
+      "protocol": "morpho",
+      "substrate": "0x1c21c59df9db44bf6f645d854ee710a8ca17b479451447e9f56758aee10a2fad",
+      "capPct": 0.25,
+      "tier": "T1",
+      "instantWithdraw": true
+    },
+    {
+      "id": 3,
+      "label": "cbXRP/USDC",
+      "protocol": "morpho",
+      "substrate": "0xd4a903dc6d949519060c7707f9604fdc9772c046e05c2e3a8fce0bd7196e4109",
+      "capPct": 0.22,
+      "tier": "T2",
+      "instantWithdraw": false
+    },
+    {
+      "id": 4,
+      "label": "cbDOGE/USDC",
+      "protocol": "morpho",
+      "substrate": "0x73527ddd796e6d4f48387adaae36f6f3d49d606d7f2a15eb0c931416a58875d8",
+      "capPct": 0.08,
+      "tier": "T3",
+      "instantWithdraw": false
+    },
+    {
+      "id": 5,
+      "label": "cbADA/USDC",
+      "protocol": "morpho",
+      "substrate": "0xd7520ad198b497b6eb75bc690268f4597630dbc12e305e9d4105843bab36e41d",
+      "capPct": 0.06,
+      "tier": "T3",
+      "instantWithdraw": false
+    },
+    {
+      "id": 6,
+      "label": "cbLTC/USDC",
+      "protocol": "morpho",
+      "substrate": "0x9125d0fa03c3137166df68bcc72283477830de2a4a5536512374c573ad4583c3",
+      "capPct": 0.05,
+      "tier": "T3",
+      "instantWithdraw": false
+    },
+    {
+      "id": 10,
+      "label": "Compound III USDC",
+      "protocol": "compoundV3",
+      "substrate": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "capPct": 0.2,
+      "tier": "venue",
+      "instantWithdraw": true
+    },
+    {
+      "id": 11,
+      "label": "Aave V3 USDC",
+      "protocol": "aaveV3",
+      "substrate": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "capPct": 0.25,
+      "tier": "venue",
+      "instantWithdraw": true
+    }
+  ],
+  "targetsPct": {
+    "cbBTC": 0.38,
+    "cbETH": 0.14,
+    "cbXRP": 0.14,
+    "cbDOGE": 0.03,
+    "cbADA": 0.02,
+    "cbLTC": 0.02,
+    "compound": 0.07,
+    "aave": 0.15,
+    "idle": 0.05
+  },
+  "aggregatePolicyCapsOffChain": {
+    "note": "Fusion market limits are PER-MARKET only. Aggregate/tier caps are NOT enforced on-chain; they are Alpha policy (IPOR) + Hypernative monitoring per spec 2.1.",
+    "totalMorphoMax": 0.8,
+    "tier2plus3Max": 0.45,
+    "tier3Max": 0.15,
+    "idleMin": 0.05
+  },
+  "roles": {
+    "OWNER_ROLE": {
+      "id": 1,
+      "account": "0x3FCA4624A7fc97301daffec96834939dE6671474",
+      "executionDelaySec": 0
+    },
+    "ATOMIST_ROLE": {
+      "id": 100,
+      "account": "0x81Bd70230a9D0928095364E3E72a900727e4Af6e",
+      "executionDelaySec": 86400,
+      "note": "24h; 172800 for 48h - CONFIRM"
+    },
+    "ALPHA_ROLE": {
+      "id": 200,
+      "account": "IPOR_ALPHA_SERVICE // CONFIRM_WITH_PAVEL",
+      "executionDelaySec": 0
+    },
+    "GUARDIAN_ROLE": {
+      "id": 2,
+      "account": "HYPERNATIVE_GUARDIAN // TBD",
+      "executionDelaySec": 0
+    },
+    "CLAIM_REWARDS_ROLE": {
+      "id": 600,
+      "account": "same as ALPHA"
+    },
+    "TRANSFER_REWARDS_ROLE": {
+      "id": 700,
+      "account": "same as ALPHA"
+    },
+    "CONFIG_INSTANT_WITHDRAWAL_FUSES_ROLE": {
+      "id": 900,
+      "account": "ATOMIST at launch (not Alpha)"
+    }
+  },
+  "fees": {
+    "performancePct": 0.1,
+    "managementPct": 0.005,
+    "bizantineRecipient": "0xB52e1E7C34887D966A03E8188ed338f098dAD723",
+    "daoFeePackageIndex": "CONFIRM_WITH_PAVEL",
+    "feeUnit": "2-decimal percent (100 = 1.00%, 1000 = 10.00%) — NOT 1e18. Verified in FeeManager.sol.",
+    "onChainTotalEquals": "IPOR DAO fee (fixed by daoFeePackageIndex at clone) + sum of recipient fees. So Bizantine recipient perf = 1000 - daoPerf; mgmt = 50 - daoMgmt (2-dp %).",
+    "note": "IPOR DAO portion set by daoFeePackageIndex at clone(). Bizantine perf/mgmt set via FeeManager.updatePerformanceFee/updateManagementFee (ATOMIST_ROLE). CONFIRM daoFeePackageIndex + the DAO perf/mgmt values so the on-chain TOTAL lands at 10% perf / 0.5% mgmt."
+  },
+  "withdrawal": {
+    "scheduledWindowSeconds": "MANDATORY_>0 // CONFIRM duration; Tier2/3 non-instant",
+    "instantWithdrawOrder": [
+      "idle",
+      11,
+      10,
+      1,
+      2
+    ],
+    "note": "idle -> Aave(11) -> Compound(10) -> cbBTC(1) -> cbETH(2). Tier2/3 (3,4,5,6) EXCLUDED."
+  },
+  "priceOracle": {
+    "middleware": "FromFusionFactory.getPriceOracleMiddleware() or priceManager",
+    "usdcUsdFeed": "Base Chainlink USDC/USD - CONFIRM"
+  },
+  "addressesToGetFromPavel": [
+    "FusionFactory address on Base",
+    "Per-market fuse INSTANCES: MorphoSupply+Balance for ids 1-6, CompoundV3Supply+Balance for 10, AaveV3Supply+Balance for 11 (supply fuse marketId is IMMUTABLE => per-market caps need per-marketId instances)",
+    "RewardsClaimManager + swap fuse (MORPHO/COMP -> USDC)",
+    "PriceOracleMiddleware + USDC/USD feed",
+    "Aave V3 PoolAddressesProvider (Base)",
+    "daoFeePackageIndex",
+    "IPOR Alpha service account",
+    "Hypernative guardian account"
+  ]
+}
