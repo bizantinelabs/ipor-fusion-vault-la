@@ -147,13 +147,111 @@ traceable, non-invented code: `TickMath.sol`/`FullMath.sol` copied verbatim from
 fuses), and `getQuoteAtTick` reproduced line-for-line from the real `@uniswap/v3-periphery`
 package, just pointed at the 0.8.30-ported files instead of the incompatible 0.7.6 originals.
 
-## 8. Still genuinely blocked (unchanged by anything above)
+## 8. CRITICAL: a single `MAX_STALENESS` cannot serve both oracle feeds
 
-- Independent security audit — not done, not attempted here.
-- Uniswap V3 FXRP/RLUSD pool depth measurement (1%/5% slippage) → supply cap.
-- WithdrawManager — not deployed.
-- Euler eUSDC-2 ERC4626 fuse instance — does not exist yet (§4).
-- LTV enforcement — needs the custom Morpho fuse wrapper described in §6, not yet written.
-- Governance decisions: fee-split reconciliation, DAO package confirmation, Morpho-14
-  Collateral-vs-Borrow fuse identity confirmation, Origin/Symbiotic-style sleeve evidence review.
+Full evidence and remediation in **`GOVERNANCE_PARAMETERS.md`**. Summary:
+
+Measured 17 consecutive Chainlink RLUSD/USD rounds — **every interval is ~86,400 s (24 h)**, min
+86,400, max 86,436. Price stayed within ±2.1 bps of $1 throughout, so the feed's 0.3% deviation
+trigger never fires; it is a pure 24-hour heartbeat. RedStone XRP/USD, by contrast, was observed
+updating **144 s** apart (with a preceding 1,056 s gap) — a minutes-scale cadence.
+
+`FXRPPriceFeedEthereum` applies one immutable `MAX_STALENESS` to both. Traced through the real
+code, a value tight enough for XRP makes the peg guard **fail open, silently**:
+
+```
+RLUSD stale -> _marketFxrpUsd() returns type(uint256).max
+            -> pegDiscountBps() returns 0
+            -> isPegHealthy() returns TRUE unconditionally
+            -> isFlooredOut() returns FALSE unconditionally
+            -> latestRoundData()'s min(xrpMark, market) picks xrpMark, so the NAV writedown never happens
+```
+
+At `MAX_STALENESS = 3600`, RLUSD is fresh ~4% of the time — the dual-mark peg protection, which the
+spec calls the highest-priority audit item and which marks 100% of collateral, would be **inert
+~96% of the time**. A value loose enough for RLUSD (≥86,436 s) instead permits a 24-hour-stale XRP
+price on a leveraged position. Both are unsafe; this needs a contract change (split into
+`MAX_STALENESS_XRP` / `MAX_STALENESS_RLUSD`), not a better number.
+
+Related: `pegDiscountBps()` returning `0` for "cannot determine" is indistinguishable from
+"perfectly healthy", and both consumers treat it as safe. The undeterminable state should fail
+**closed**.
+
+## 9. Pool depth measured — supply cap computable, and the v2 estimate was too pessimistic
+
+Ran a QuoterV2 sweep in both directions (read-only, no key). Reproducible via
+`script/measure_depth.sh`. Pool holds 966,651 FXRP + 1,961,444 RLUSD (~$2.96M).
+
+| Direction | 1% deviation | 5% deviation |
+|---|---|---|
+| FXRP→RLUSD (exit/delever) | ~155,000 FXRP | ~807,800 FXRP |
+| RLUSD→FXRP (entry) | ~161,000 RLUSD | ~728,800 FXRP-equiv |
+
+Applying the spec §12 formula with the **worse** direction, per the v2 package's own rule:
+
+```
+supply_cap = depth_at_5% / (hardMaxLTV × stressMultiple) = 728,800 / (0.40 × 3) = 607,333 FXRP
+```
+
+**This contradicts the v2 deployment package**, which estimated *"tens of thousands of FXRP, not
+hundreds of thousands"* and declared the spec's illustrative 420,000–830,000 range "void". That
+estimate used a constant-product approximation on a **concentrated-liquidity** pool and
+under-measured real depth by roughly an order of magnitude. Measured 5% depth is ~$755k, squarely
+inside the spec's original $500k–1M illustrative band, and the resulting cap (~607k FXRP) is inside
+its original 420k–830k range.
+
+Caveats that must travel with this number: single point-in-time measurement; QuoterV2 simulates
+against current state so real execution (MEV, concurrent flow) will be worse; concentrated
+liquidity can be withdrawn by its LPs; and 5% slippage is a severe assumption for an emergency
+delever. Re-run `measure_depth.sh` immediately before setting the cap on-chain.
+
+## 10. TWAP buffer is the longest-lead blocker, and it is cheap and permissionless
+
+`increaseObservationCardinalityNext` has **no access control** — any funded EOA can call it. It does
+not touch vault custody, needs no audit, and no governance vote. At the gas price observed while
+writing this (0.07 gwei), growing to cardinality 150 costs **~0.0002 ETH**.
+
+It is nonetheless the item with the longest wall-clock lead, because after the call the ring buffer
+must physically fill with observations spanning `TWAP_WINDOW`, and slots are only written when the
+pool is traded — on a pool doing ~$84k/24h that is driven by trade arrival, not block production.
+Everything downstream (deploying the price feed, calibrating `MAX_DISCOUNT_BPS`, trusting the peg
+guard at all) is blocked behind it.
+
+`script/PrepareTwapObservations.s.sol` provides both the transaction and a `check()` view that
+reports whether the 900 s TWAP tick has diverged from spot — while they are equal, the buffer has
+not filled and the feed must not be deployed.
+
+## 11. LTV enforcement — now written (`contracts/MorphoLtvGuardedFuse.sol`)
+
+Written as a **fuse**, not a pre-hook, for the reason in §6. Instead of simulating the post-action
+position, it performs the operation and reads the **real** resulting position back from Morpho,
+reverting the transaction if the limit is breached — which removes the replication risk a simulator
+would carry. The LTV math mirrors Morpho's own `_isHealthy` exactly, including rounding directions
+(borrowed up, collateral value down), so the computed LTV is conservative.
+
+It guards **both** leverage-increasing paths — borrowing *and* collateral withdrawal. Guarding only
+the borrow leg would leave collateral withdrawal as an unguarded route to arbitrary LTV. Repay and
+`supplyCollateral` are deliberately ungated so an emergency delever can never be blocked, and
+collateral withdrawal is deliberately *not* peg-gated for the same reason (its LTV check still
+prevents levering up).
+
+Math verified against live mainnet state: 1,000,000 FXRP collateral values at 1,033,509 RLUSD via
+Morpho's oracle, and 400,000 RLUSD of debt computes to 3,870 bps — correctly below the 4,000 bps
+hard max. Live market params confirmed to match the spec exactly (loanToken RLUSD, collateralToken
+FXRP, LLTV `7.7e17` = 77%).
+
+Still unaudited. This contract is the single highest-value audit target in the package.
+
+## 12. Still genuinely blocked
+
+- **Independent security audit** — not done, not attempted here. Now covers the oracle, the Agua
+  fuses, and `MorphoLtvGuardedFuse`.
+- **`MAX_STALENESS` contract change** (§8) — deployment should not proceed on the current
+  single-parameter design.
+- **TWAP buffer** (§10) — start immediately; longest lead, trivial cost.
+- **`MAX_DISCOUNT_BPS`** — uncalibratable until ≥30 days of TWAP history exists.
+- **WithdrawManager** — not deployed.
+- **Euler eUSDC-2 ERC4626 fuse instance** — does not exist yet (§4).
+- **Governance decisions**: fee-split reconciliation, DAO package confirmation, Morpho-14
+  Collateral-vs-Borrow fuse identity confirmation, sleeve evidence review.
 - No signer/broadcast capability exists in this environment regardless of the above.
