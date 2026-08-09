@@ -77,11 +77,11 @@ fingerprinted each returned address via its `MARKET_ID()` immutable:
 reverts on both — they expect delegatecall context from a vault, so this can't be resolved by a
 plain read). Confirm against IPOR's fuse registry or their team before whitelisting either.
 
-**Confirmed gap:** neither existing ERC4626 market instance on `bdUSD` (100001 → substrate
-`0x3bc80141...`, 100002 → substrate `0xa3931d71...`) targets Euler eUSDC-2
-(`0x797DD80692c3b2dAdabCe8e30C07fDE5307D48a9`). **No shared ERC4626 fuse instance for eUSDC-2
-exists yet** — this must be requested from IPOR or freshly deployed, same "per-instance" pattern
-found during the earlier cbBase-USDC-CORE work on Base.
+~~**Confirmed gap:** no shared ERC4626 fuse instance for eUSDC-2 exists yet; must be requested from
+IPOR or freshly deployed.~~ — **RETRACTED, this was wrong. See §13.** The observation that neither
+`bdUSD` ERC4626 instance (100001 → substrate `0x3bc80141...`, 100002 → substrate `0xa3931d71...`)
+*currently* targets eUSDC-2 is accurate, but the conclusion drawn from it was not: substrates are
+per-vault, so no new fuse deployment is required.
 
 ## 5. Agua interface — verified where possible, flagged where not
 
@@ -244,14 +244,72 @@ Still unaudited. This contract is the single highest-value audit target in the p
 
 ## 12. Still genuinely blocked
 
-- **Independent security audit** — not done, not attempted here. Now covers the oracle, the Agua
-  fuses, and `MorphoLtvGuardedFuse`.
+- **Independent security audit** — not done, not attempted here. Now covers the oracle and
+  `MorphoLtvGuardedFuse`. (The Agua fuses drop out of scope under a reserve-only Phase 1 — §13.)
 - **`MAX_STALENESS` contract change** (§8) — deployment should not proceed on the current
   single-parameter design.
 - **TWAP buffer** (§10) — start immediately; longest lead, trivial cost.
 - **`MAX_DISCOUNT_BPS`** — uncalibratable until ≥30 days of TWAP history exists.
-- **WithdrawManager** — not deployed.
-- **Euler eUSDC-2 ERC4626 fuse instance** — does not exist yet (§4).
-- **Governance decisions**: fee-split reconciliation, DAO package confirmation, Morpho-14
-  Collateral-vs-Borrow fuse identity confirmation, sleeve evidence review.
+- **Roles** (§13) — nothing can be configured until OWNER grants ATOMIST and below.
+- **Governance decisions**: ownership target, carry-sleeve decision, Morpho-14
+  Collateral-vs-Borrow fuse identity confirmation.
 - No signer/broadcast capability exists in this environment regardless of the above.
+
+**Removed from this list** (previously listed, since disproven — see §13): WithdrawManager
+deployment, the Euler eUSDC-2 fuse instance, and fee-split reconciliation.
+
+## 13. Corrections — three things the documents (and §4 above) got wrong
+
+Verified read-only on 2026-08-09. Each of these removes work that was believed necessary.
+
+**13.1 — The WithdrawManager already exists.** Every document says "NOT DEPLOYED". Reading the
+vault's `WITHDRAW_MANAGER` storage slot
+(`0x465d2ff0062318fe6f4c7e9ac78cfcd70bc86a1d992722875ef83a9770513100`) returns
+**`0x6d90e8a898280e6a8f0845b80909c5fc2e3d5b03`**, and that contract's `getPlasmaVaultAddress()`
+returns the vault — bidirectionally wired. It is a 45-byte EIP-1167 clone, consistent with
+`FusionFactoryLogicLib` calling `WithdrawManagerFactory.clone()` during `clone()`.
+
+Current config: `getWithdrawWindow()` = **86400 s** (factory default; spec wants 7 days),
+`getWithdrawFee()` = 0, `getRequestFee()` = 0 (both already spec-compliant).
+
+This was worth checking carefully, because `PlasmaVaultLib.updateWithdrawManager` is `internal` and
+is called **only** from `PlasmaVault.initialize()` — there is no governance setter. Had the slot
+been empty, this shell could never have supported scheduled withdrawals and would have required a
+full redeploy. It is set. Remaining work is one call: `updateWithdrawWindow(604800)`.
+
+**13.2 — ERC4626 fuse instances are reusable across vaults.** `Erc4626SupplyFuse.enter/exit` gate on
+`PlasmaVaultConfigLib.isSubstrateAsAssetGranted(MARKET_ID, data_.vault)` and `Erc4626BalanceFuse`
+reads `PlasmaVaultConfigLib.getMarketSubstrates(MARKET_ID)` — both resolve against **vault** storage
+under delegatecall. The fuse is stateless with respect to *which* ERC4626 vaults are permitted; that
+is per-vault configuration. So bzFXRP-ETH can whitelist an already-deployed ERC4626 fuse instance and
+grant eUSDC-2 as a substrate in its own storage. No new deployment, no request to IPOR.
+
+**13.3 — Fees are fully reconcilable and the numbers are known.**
+`getPerformanceFeeData()` = (`0xC5BdBB34…872F`, 1000), `getManagementFeeData()` =
+(`0x7444224f…8e86`, 5). Both are FeeAccount clones whose `FEE_MANAGER()` is
+**`0x8a322db71d271bb12132F93F83Bf2a667c64e6B1`**. That FeeManager reports
+`getTotalPerformanceFee()` = 1000, `getTotalManagementFee()` = 5, DAO recipient `0xF6a9…5569` —
+i.e. IPOR DAO fee package **A (0.05% mgmt / 10% perf)**, with **no curator slice added yet**.
+
+To reach the spec's 50 bps / 15% totals, Bizantine's recipient slice is exactly
+**management 45, performance 500**, paid to `0x3D5341AE003BD0cCd05FD38273CC28832205f29E`, via
+`updateManagementFee` / `updatePerformanceFee` on that FeeManager.
+
+**13.4 — Control state: only one address can act.** `hasRole` sweep on AccessManager
+`0x2BEc…f2E2` across roles 0/1/2/100/200/300/800/1200:
+
+| Account | Roles |
+|---|---|
+| `0x327d70c3…1474` | **OWNER (1)** |
+| Governance Safe `0x3FCA4624…1474` (spec §3) | none |
+| Fordefi MPC `0x81Bd7023…Af6e` (spec: ALPHA) | none |
+| Hypernative `0x7420fE73…ad1Df` (spec: GUARDIAN) | none |
+| IPOR DAO `0xF6a9…5569` | none |
+
+No ATOMIST, FUSE_MANAGER, ALPHA, GUARDIAN, WHITELIST, or PRICE_ORACLE_MIDDLEWARE_MANAGER exists, so
+**no configuration call can execute today** except from `0x327d70c3…1474`. Per `Roles.sol` the grant
+chain is OWNER → ATOMIST → everything else. Note the on-chain owner is **not** the Governance Safe
+the spec names — that discrepancy needs resolving before roles are assigned.
+
+Deposits are currently closed (no WHITELIST_ROLE holder, `totalSupply` 0), which is the correct
+safe state.

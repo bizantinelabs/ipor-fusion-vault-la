@@ -70,15 +70,29 @@ without inventing any address, ABI, or role id.
   (no fuse instance exists yet), Agua, and LTV enforcement — none of those exist yet. **Compiles
   clean** but is explicitly marked DO NOT BROADCAST in its header.
 
-## What remains blocked regardless of anything in this folder
+## How this vault gets finalized
 
-Independent security audit (now covering the oracle, the Agua fuses, and `MorphoLtvGuardedFuse`);
-the `MAX_STALENESS` contract change; the TWAP buffer fill; `MAX_DISCOUNT_BPS` calibration (needs
-≥30 days of TWAP history); WithdrawManager deployment; a real ERC4626 fuse instance for Euler
-eUSDC-2; and governance sign-off on fee split / DAO package / role assignments.
+**`FINALIZATION_PLAN.md`** is the sequenced plan: what is actually left, in what order, and what
+runs in parallel. Read it with `FINDINGS.md` §13, which corrects three things the source documents
+got wrong.
 
-Pool depth is no longer a blocker — it is measured (`FINDINGS.md` §9), yielding a computed cap of
-~607,000 FXRP, which notably **corrects** the earlier v2 package's "tens of thousands" estimate.
+## What remains blocked
+
+- Independent security audit — now scoped to the oracle and `MorphoLtvGuardedFuse`.
+- The `MAX_STALENESS` contract change (critical — see above).
+- TWAP buffer fill, and `MAX_DISCOUNT_BPS` calibration behind it (needs ≥30 days of history).
+- Role assignment — **nothing can be configured today**; only `0x327d70c3…1474` holds any role
+  (OWNER), and the Governance Safe / Fordefi / Hypernative addresses the spec names hold nothing.
+- Governance decisions: ownership target, and the carry-sleeve decision.
+
+**No longer blocked** — four items the documents list that are already resolved:
+
+| Previously believed | Actually |
+|---|---|
+| WithdrawManager must be deployed | Already exists and is wired; needs one `updateWithdrawWindow(604800)` call |
+| eUSDC-2 needs a new ERC4626 fuse instance | Existing instances are reusable (substrates are per-vault) |
+| Fee split unverified | Fully traced; curator slice is mgmt **45** / perf **500** on FeeManager `0x8a322db7…e6B1` |
+| Pool depth unmeasured | Measured; cap ~**607,000 FXRP**, correcting v2's "tens of thousands" |
 
 No signer or broadcast capability was used or is available in the environment that produced this
 package, and no private key should ever be pasted into a chat transcript to change that.
