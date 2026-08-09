@@ -1,0 +1,30 @@
+{
+  "_comment": "FusionFactory deployment addresses. Fill 'fusion_factory' with the official IPOR Fusion factory address for each chain you deploy on (see docs.ipor.io / IPOR Discord). Placeholder zero addresses are rejected by the deployer.",
+  "factories": {
+    "ethereum": {
+      "fusion_factory": "0x0000000000000000000000000000000000000000",
+      "rpc_env": "ETHEREUM_RPC_URL",
+      "chain_id": 1,
+      "dao_fee_package_index": 0
+    },
+    "base": {
+      "fusion_factory": "0x0000000000000000000000000000000000000000",
+      "rpc_env": "BASE_RPC_URL",
+      "chain_id": 8453,
+      "dao_fee_package_index": 0
+    },
+    "arbitrum": {
+      "fusion_factory": "0x0000000000000000000000000000000000000000",
+      "rpc_env": "ARBITRUM_RPC_URL",
+      "chain_id": 42161,
+      "dao_fee_package_index": 0
+    }
+  },
+  "underlying_tokens": {
+    "USDC": {
+      "ethereum": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "base": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+      "arbitrum": "0xaf88d065e77c8cC2239327C5EDb3A432268e5831"
+    }
+  }
+}

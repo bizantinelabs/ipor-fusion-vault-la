@@ -1,0 +1,218 @@
+{
+  "meta": {
+    "product": "Bizantine cbBase USDC CORE",
+    "symbol": "bizcbBaseUSDC",
+    "chain": "Base",
+    "chainId": 8453,
+    "framework": "IPOR Fusion (Plasma Vault, ERC-4626)",
+    "specVersion": "v0.8",
+    "dataAsOf": "2026-07-07",
+    "architectureNote": "CANONICAL IPOR marketIds (IporFusionMarkets.sol): Morpho=14 (single, all cb markets as substrates, summed balance), AaveV3=1, CompoundV3_USDC=2, idle ERC20=7. Per-cb caps are NOT on-chain under this model; only aggregate Morpho/Aave/Compound caps are (see capsOnChain vs perCbCapsOffChain)."
+  },
+  "asset": {
+    "USDC": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+    "decimals": 6
+  },
+  "redemptionDelaySeconds": 3600,
+  "protocols": {
+    "active": [
+      "Morpho (marketId 14)",
+      "Aave V3 (marketId 1)"
+    ],
+    "disabled": [
+      "Compound V3 USDC (marketId 2) \u2014 no canonical fuse deployed on Base"
+    ],
+    "notUsed": [
+      "ERC20_VAULT_BALANCE idle (marketId 7) \u2014 idle USDC is underlying, counted natively"
+    ]
+  },
+  "canonicalMarketIds": {
+    "AAVE_V3": 1,
+    "COMPOUND_V3_USDC": 2,
+    "ERC20_VAULT_BALANCE_idle": 7,
+    "MORPHO": 14
+  },
+  "morphoSubstrates": [
+    {
+      "label": "cbBTC/USDC",
+      "id": "0x9103c3b4e834476c9a62ea009ba2c884ee42e94e6e314a26f04d312434191836",
+      "tier": "T1",
+      "targetPct": 0.38,
+      "policyCapPct": 0.5,
+      "instantWithdraw": true
+    },
+    {
+      "label": "cbETH/USDC",
+      "id": "0x1c21c59df9db44bf6f645d854ee710a8ca17b479451447e9f56758aee10a2fad",
+      "tier": "T1",
+      "targetPct": 0.14,
+      "policyCapPct": 0.25,
+      "instantWithdraw": true
+    },
+    {
+      "label": "cbXRP/USDC",
+      "id": "0xd4a903dc6d949519060c7707f9604fdc9772c046e05c2e3a8fce0bd7196e4109",
+      "tier": "T2",
+      "targetPct": 0.14,
+      "policyCapPct": 0.22,
+      "instantWithdraw": false
+    },
+    {
+      "label": "cbDOGE/USDC",
+      "id": "0x73527ddd796e6d4f48387adaae36f6f3d49d606d7f2a15eb0c931416a58875d8",
+      "tier": "T3",
+      "targetPct": 0.03,
+      "policyCapPct": 0.08,
+      "instantWithdraw": false
+    },
+    {
+      "label": "cbADA/USDC",
+      "id": "0xd7520ad198b497b6eb75bc690268f4597630dbc12e305e9d4105843bab36e41d",
+      "tier": "T3",
+      "targetPct": 0.02,
+      "policyCapPct": 0.06,
+      "instantWithdraw": false
+    },
+    {
+      "label": "cbLTC/USDC",
+      "id": "0x9125d0fa03c3137166df68bcc72283477830de2a4a5536512374c573ad4583c3",
+      "tier": "T3",
+      "targetPct": 0.02,
+      "policyCapPct": 0.05,
+      "instantWithdraw": false
+    }
+  ],
+  "capsOnChain": {
+    "note": "aggregate per-protocol, 1e18=100%",
+    "Morpho_mkt14": "0.80e18",
+    "AaveV3_mkt1": "0.25e18",
+    "Compound_mkt2": "DISABLED (leg removed; former 7% target reallocated in Alpha policy)"
+  },
+  "perCbCapsOffChain": {
+    "note": "cbBTC 50 / cbETH 25 / cbXRP 22 / cbDOGE 8 / cbADA 6 / cbLTC 5, plus tier buckets (T2+3<=45, T3<=15) and idle>=5. NOT on-chain under canonical single-Morpho model \u2014 enforced by IPOR Alpha policy + Hypernative. See RESOLUTIONS.md for Option A (custom per-cb marketIds) if on-chain enforcement is required."
+  },
+  "dependencyBalanceGraph": {
+    "value": "NONE",
+    "reason": "plain supply positions have no cross-market balance dependency; market-7 idle not tracked"
+  },
+  "roles": {
+    "OWNER_ROLE": {
+      "id": 1,
+      "account": "0x327d70c3E11CD26f3f11295459e6f4fbB6071474",
+      "executionDelaySec": 0,
+      "baseStatus": "EOA (Fordefi MPC) \u2014 same address on Base, no Safe to deploy. Confirm Base enabled in Fordefi.",
+      "note": "Fordefi (Noah 2026-07-07); granted by IPOR vault wizard"
+    },
+    "ATOMIST_ROLE": {
+      "id": 100,
+      "account": "0x81Bd70230a9D0928095364E3E72a900727e4Af6e",
+      "executionDelaySec": 86400,
+      "note": "24h; 172800 for 48h - Bizantine choice",
+      "baseStatus": "EOA (Fordefi MPC), Base nonce 0 (never tx'd on Base) - send a test tx pre-deploy"
+    },
+    "ALPHA_ROLE": {
+      "id": 200,
+      "account": "0x6d3BE3f86FB1139d0c9668BD552f05fcB643E6e6",
+      "executionDelaySec": 0,
+      "note": "IPOR-operated keeper; address from IPOR vault wizard. Config-incapable (negative test)."
+    },
+    "GUARDIAN_ROLE": {
+      "id": 2,
+      "account": "0x7420fE73F5c21D7d32E7a15B7eAAF7dB9ccad1Df",
+      "executionDelaySec": 0,
+      "note": "Hypernative-issued response address; pause-only. Must act independently of the Alpha key."
+    },
+    "CLAIM_REWARDS_ROLE": {
+      "id": 600,
+      "account": "0x6d3BE3f86FB1139d0c9668BD552f05fcB643E6e6 (same as ALPHA)"
+    },
+    "TRANSFER_REWARDS_ROLE": {
+      "id": 700,
+      "account": "0x6d3BE3f86FB1139d0c9668BD552f05fcB643E6e6 (same as ALPHA)"
+    },
+    "CONFIG_INSTANT_WITHDRAWAL_FUSES_ROLE": {
+      "id": 900,
+      "account": "ATOMIST at launch (not Alpha)"
+    },
+    "grantedBy": "IPOR vault wizard (confirmed 2026-07-07) \u2014 script does NOT grant roles"
+  },
+  "fees": {
+    "scale": "percentage with 2 decimals: 10000=100%, 100=1%",
+    "bizantineRecipient": {
+      "performance": "1000 (10.00%)",
+      "management": "0 (0.00%)",
+      "recipient": "0xB52e1E7C34887D966A03E8188ed338f098dAD723",
+      "note": "Bizantine cut is ON TOP of IPOR DAO package"
+    },
+    "daoFeePackageIndex": 1,
+    "daoPackagesReadOnChain": {
+      "0": "0.05% mgmt / 10% perf",
+      "1": "0.30% mgmt / 2% perf (standard, SELECTED)",
+      "2": "0.50% mgmt / 0% perf",
+      "recipient": "0xf6a9bd8F6DC537675D499Ac1CA14f2c55d8b5569 (IPOR DAO)"
+    },
+    "lpFacingTotal": {
+      "performance": "12% (10% Bizantine + 2% DAO)",
+      "management": "0.3% (0% Bizantine + 0.3% DAO)"
+    },
+    "confirmWithPavel": "daoFeePackageIndex entitlement"
+  },
+  "withdrawal": {
+    "redemptionDelaySeconds": 3600,
+    "withdrawWindowSeconds": 172800,
+    "factoryDefaultWindow": 86400,
+    "note": "we override factory default 86400 -> 172800 (48h)"
+  },
+  "priceOracle": {
+    "middleware": "FusionInstance.priceManager (from clone)",
+    "usdcUsdFeed": "Base Chainlink USDC/USD - CONFIRM added in priceManager"
+  },
+  "resolvedThisPass": [
+    "Architecture: canonical Morpho=14 single / Aave=1 / Compound=2 / idle=7 (was: wrong per-market 1-6/10/11).",
+    "Fuse instances: 3 supply + 4 balance canonical shared fuses (not 6 Morpho instances). Addresses from Pavel.",
+    "DAO fee split: 0.3% mgmt + 2% of perf (fixed, per IPOR docs).",
+    "Withdraw window: setter + 48h recommendation.",
+    "Safes on Base: EOAs/Fordefi MPC, no Safe contract to deploy; same address on Base (verified on-chain).",
+    "IPOR Alpha address set from vault wizard: 0x6d3BE3f86FB1139d0c9668BD552f05fcB643E6e6",
+    "Hypernative guardian set: 0x7420fE73F5c21D7d32E7a15B7eAAF7dB9ccad1Df",
+    "On-chain verified + filled: FusionFactory, Morpho supply+balance, Aave supply+balance, Aave provider",
+    "daoFeePackageIndex=1 (0.30%/2%) read on-chain",
+    "Fee scale corrected to 2-decimal percentage (PERF=1000, MGMT=50)",
+    "Compound USDC leg disabled (no Base fuse); idle market-7 removed (idle USDC native)",
+    "Owner set to Fordefi 0x327d70c3E11CD26f3f11295459e6f4fbB6071474",
+    "Fees final: Bizantine 0% mgmt / 10% perf on top of IPOR DAO (LP total 12% perf / 0.3% mgmt)",
+    "Roles granted by IPOR wizard \u2014 script step 10 removed",
+    "Compound leg dropped (final); Fordefi Base enablement confirmed"
+  ],
+  "stillNeededExternal": [
+    "Wizard: set Owner/Atomist/FuseManager/PriceOracleMiddlewareManager to Fordefi (owner=0x327d70c3E11CD26f3f11295459e6f4fbB6071474), NOT the IPOR default 0xF6a9..5569",
+    "Broadcast steps 2-9 from the account the wizard granted FUSE_MANAGER/ATOMIST to (or do config in wizard UI)",
+    "CONFIRM w/ Pavel: daoFeePackageIndex entitlement; markets-limits activation call; instant-withdraw params[] layout",
+    "forge build + fork-sim clean pass -> broadcast --verify -> run VERIFY.md -> seed anchor TVL -> open"
+  ],
+  "fuseInstancesResolved": {
+    "verifiedOnChain": "2026-07-07 via Base RPC eth_call",
+    "source": "IPOR ipor-abi registry: mainnet/mainnet-base-fusion/addresses.json",
+    "FusionFactory_IporFusionFactoryProxy": "0x1455717668fA96534f675856347A973fA907e922",
+    "SupplyFuseMorpho_mkt14": "0xae93EF3cf337b9599F0dfC12520c3C281637410F",
+    "BalanceFuseMorpho_mkt14": "0x7916856E11E0CA021967D0D4daC49D737b7d73d5",
+    "SupplyFuseAaveV3_mkt1": "0x26fD6EF391E98C78CfCA27e00c3d15be4D941625",
+    "BalanceFuseAaveV3_mkt1": "0xf53f3EaFfDf67539256365cA7299540A98b60BA9",
+    "AaveV3PoolAddressesProvider": "0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D",
+    "checks": {
+      "SupplyFuseMorpho.MARKET_ID": 14,
+      "SupplyFuseMorpho.MORPHO": "0xBBBBBbbBBb9cC5e90e3b3Af64bdAF62C37EEFFCb",
+      "BalanceFuseMorpho.MARKET_ID": 14,
+      "SupplyFuseAaveV3.MARKET_ID": 1,
+      "SupplyFuseAaveV3.AAVE_V3_POOL_ADDRESSES_PROVIDER": "0xe20fCBdBfFC4Dd138cE8b2E6FBb6CB49777ad64D",
+      "BalanceFuseAaveV3.MARKET_ID": 1,
+      "AaveV3PoolAddressesProvider.getPool": "0xA238Dd80C259a72e81d7e4664a9801593F98d1c5"
+    },
+    "compoundGap": "registry has only SupplyFuseCompoundV3WEth 0xD72Dd19C04362488a4143F43e407ec87A849b72b (verified MARKET_ID=26, base token WETH). No USDC (mkt2) fuse. Base USDC comet=0xb125E6687d4313864e53df431d5425969c15Eb2F."
+  },
+  "compoundLeg": {
+    "status": "DROPPED (final, Noah 2026-07-07)",
+    "reason": "no Compound V3 USDC fuse on Base",
+    "reallocation": "former 7% handled in Alpha policy (e.g. Aave toward 22%, under 25% cap)"
+  }
+}
