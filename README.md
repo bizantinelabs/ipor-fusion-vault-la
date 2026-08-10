@@ -132,3 +132,10 @@ See `docs/deployment.md` for details.
 - No recursive loops.
 - No unapproved routes.
 - No private keys in repo.
+
+## Live data via MCP
+
+This repo registers the official IPOR Fusion MCP server (`https://mcp.ipor.io/`)
+in [`.mcp.json`](.mcp.json), giving Claude Code and other MCP clients
+read-only access to live vault, deployment, and Morpho market data. See
+[`docs/mcp.md`](docs/mcp.md) for the available tools and how to enable it.
